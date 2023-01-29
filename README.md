@@ -31,6 +31,15 @@ alternatively you can import one of the <code>.unitypackage</code> files.
 - Jump buffering.
 - Coyote time.
 
+#### In Development
+> **Note**: None of this is guaranteed to be in the [stable repository](https://github.com/SyrupMedia/media.syrup.unity.player) or [latest commit](https://github.com/MolassesLover/media.syrup.unity.player/commits/master).
+- [ ] Combat animation.
+- [ ] Wall collision.
+- [ ] Wall sliding.
+- [ ] Wall jumping.
+- [ ] Rolling.
+- [ ] Evading.
+
 ### Questions
 
 > Can this be used in a commercial project?
