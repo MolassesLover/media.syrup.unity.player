@@ -10,7 +10,10 @@ public class Player : MonoBehaviour
 {
 #region Variables
 
+public GameObject player;
+
 [Header("Physics")]
+public Rigidbody rigidbody;
 public bool applyGravity;
 public float gravity = -9.81f;
 private Vector3 verticalVelocity;
@@ -18,7 +21,6 @@ private bool isGrounded;
 public Transform groundCheck;
 public float groundDistance = 0.5f;
 public LayerMask groundLayer;
-
 
 [Header("Graphics")]
 public Animator animator;
@@ -39,6 +41,7 @@ private GameObject[] cameras;
 public bool lockedMouse;
 
 [Header("Locomotion")]
+public WallRunning wallRunComponent;
 [Tooltip("Determines the player's movement speed.")]
 [Range(1f, 10f)]
 [Min(1f)]
@@ -57,6 +60,7 @@ public float coyoteTime = 0.25f;
 private float coyoteTimeCounter;
 [Range(0.1f, 0.5f)]
 [Min(0.0f)]
+private Vector3 wallForward;
 public float jumpBufferTime = 0.25f;
 private float jumpBufferCounter;
 
@@ -81,75 +85,82 @@ private void Start() {
 
 // Update() is called once per frame.
 private void Update() {
-    if (Input.GetButtonDown("Cancel")) {
-        Cursor.lockState = CursorLockMode.None;
-        lockedMouse = false;
-    }
+    if (! wallRunComponent.gluedToWall) {
+        rigidbody.isKinematic = true;
 
-    float horizontal = Input.GetAxis("Horizontal");
-    float vertical = Input.GetAxis("Vertical");
+        if (Input.GetButtonDown("Cancel")) {
+            Cursor.lockState = CursorLockMode.None;
+            lockedMouse = false;
+        }
 
-    if (Input.GetButtonDown("Jump")) {
-        jumpBufferCounter = jumpBufferTime;
-    } else {
-        jumpBufferCounter -= Time.deltaTime;
-    }
+        float horizontal = Input.GetAxis("Horizontal");
+        float vertical = Input.GetAxis("Vertical");
 
-    animator.SetFloat("horizontal", horizontal);
-    animator.SetFloat("vertical", vertical);
-
-    Vector3 direction = new Vector3(horizontal, 0f, vertical).normalized;
-
-    if (direction.magnitude >= 0.1f) {
-        animator.SetBool("isWalking", true);
-
-        float targetAngle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg + mainCamera.eulerAngles.y;
-        float angle = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetAngle, ref turnVelocity, turnSmoothing);
-
-        transform.rotation = Quaternion.Euler(0f, angle, 0f);
-
-        Vector3 moveDirection = Quaternion.Euler(0f, targetAngle, 0f) * Vector3.forward;
-        controller.Move(moveDirection.normalized * movementSpeed * Time.deltaTime);
-    } else {
-        animator.SetBool("isWalking", false);
-    }
-
-    if (applyGravity == true) {
-        // This is the same approach featured in Brackeys' FPS Controller.
-        // https://youtu.be/_QajrabyTJc?t=1132
-        isGrounded = Physics.CheckSphere(groundCheck.position, groundDistance, groundLayer);
-        isLanding = Physics.CheckSphere(groundCheck.position, landingDistance, groundLayer);
-
-        if (isGrounded) {
-            animator.SetBool("isGrounded", true);
+        if (Input.GetButtonDown("Jump")) {
+            jumpBufferCounter = jumpBufferTime;
         } else {
-            animator.SetBool("isGrounded", false);
+            jumpBufferCounter -= Time.deltaTime;
         }
 
-        if (isLanding) {
-            animator.SetBool("isLanding", true);
+        animator.SetFloat("horizontal", horizontal);
+        animator.SetFloat("vertical", vertical);
+
+        Vector3 direction = new Vector3(horizontal, 0f, vertical).normalized;
+
+        if (direction.magnitude >= 0.1f) {
+            animator.SetBool("isWalking", true);
+
+            float targetAngle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg + mainCamera.eulerAngles.y;
+            float angle = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetAngle, ref turnVelocity, turnSmoothing);
+
+            transform.rotation = Quaternion.Euler(0f, angle, 0f);
+
+            Vector3 moveDirection = Quaternion.Euler(0f, targetAngle, 0f) * Vector3.forward;
+            controller.Move(moveDirection.normalized * movementSpeed * Time.deltaTime);
         } else {
-            animator.SetBool("isLanding", false);
+            animator.SetBool("isWalking", false);
         }
 
-        if (isGrounded && verticalVelocity.y < 0) {
-            coyoteTimeCounter = coyoteTime;
-            verticalVelocity.y = -2.5f;
-        } else {
-            coyoteTimeCounter -= Time.deltaTime;
+        if (applyGravity == true) {
+            // This is the same approach featured in Brackeys' FPS controller.
+            // https://youtu.be/_QajrabyTJc?t=1132
+            isGrounded = Physics.CheckSphere(groundCheck.position, groundDistance, groundLayer);
+            isLanding = Physics.CheckSphere(groundCheck.position, landingDistance, groundLayer);
+
+            if (isGrounded) {
+                animator.SetBool("isGrounded", true);
+            } else {
+                animator.SetBool("isGrounded", false);
+            }
+
+            if (isLanding) {
+                animator.SetBool("isLanding", true);
+            } else {
+                animator.SetBool("isLanding", false);
+            }
+
+            if (isGrounded && verticalVelocity.y < 0) {
+                coyoteTimeCounter = coyoteTime;
+                verticalVelocity.y = -2.5f;
+            } else {
+                coyoteTimeCounter -= Time.deltaTime;
+            }
+
+            if (coyoteTimeCounter > 0f && jumpBufferCounter > 0f && isGrounded) {
+                
+                verticalVelocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
+                animator.SetTrigger("jump");
+                coyoteTimeCounter = 0f;
+            }
+
+            verticalVelocity.y += gravity * Time.deltaTime;
+            animator.SetFloat("verticalVelocity", verticalVelocity.y);
+
+            controller.Move(verticalVelocity * Time.deltaTime);
         }
-
-        if (coyoteTimeCounter > 0f && jumpBufferCounter > 0f && isGrounded) {
-            
-            verticalVelocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
-            animator.SetTrigger("jump");
-            coyoteTimeCounter = 0f;
-        }
-
-        verticalVelocity.y += gravity * Time.deltaTime;
-        animator.SetFloat("verticalVelocity", verticalVelocity.y);
-
-        controller.Move(verticalVelocity * Time.deltaTime);
+    } else if (wallRunComponent.gluedToWall) {
+        player.GetComponent<CharacterController>().enabled = false;
+        rigidbody.isKinematic = false;
     }
 }
 
